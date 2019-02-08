@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title><%= htmlWebpackPlugin.options.title %></title>
+    <style>
+        .container {
+            width: 800px;
+            height: 600px;
+        }
+        #rete {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .socket.number{
+            background: #96b38a
+        }
+    </style>    
+  </head>
+  <body>
+    <div class="container">
+        <div id="rete" class="node-editor"></div>
+    </div>
+  </body>
+</html>

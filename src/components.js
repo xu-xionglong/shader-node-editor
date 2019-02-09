@@ -1,4 +1,8 @@
 import Rete from 'rete';
+import {
+    TextInputControl,
+    ImageSelectControl,
+} from './Controls'
 
 const anyTypeSocket = new Rete.Socket('Number value');
 const typeMap = ["float", "vec2", "vec3", "vec4"];
@@ -30,11 +34,12 @@ class Expression extends Rete.Component {
             inputVariableNames[socketName] = input.variableName;
         }
 
-        let dimension = deriveOutputDimension(inputs);
+        let dimension = this.deriveOutputDimension(inputs);
         if(dimension > 0) {
             let variableName = this.name.toLowerCase() + "_" + node.id;
-            outputs[outputSocketName] = {variableName, dimension};
-            let statement = typeMap[dimension - 1] + " " + variableName + " = " + format(inputVariableNames) + ";\n";
+            outputs[this.outputSocketName] = {variableName, dimension};
+            let statement = typeMap[dimension - 1] + " " + variableName + " = " + this.format(inputVariableNames);
+            this.editor.nodes.find(n => n.id == node.id).material.appendSourceLine(statement);
         }
     }
 
@@ -141,18 +146,60 @@ export class Mix extends Expression {
 };
 
 class Constant extends Rete.Component {
-    constructor(dimension) {
-
+    constructor(name, dimension) {
+        super(name);
+        this.dimension = dimension;
+        this.formatChecker = (value) => {
+            //todo: check format
+            return true;
+        };
     }
 
     builder(node) {
-
+        node.addOutput(new Rete.Output("v", "v", anyTypeSocket));
+        node.addControl(new TextInputControl("value", this.editor, this.formatChecker));
+        return node;
     }
 
     worker(node, inputs, outputs) {
-
+        let value = node.data.value;
+        if(value === undefined) {
+            return;
+        }
+        let variableName = this.name.toLowerCase() + "_" + node.id;
+        outputs["v"] = {dimension: this.dimension, variableName};
+        let type = typeMap[this.dimension - 1];
+        if(this.dimension > 1) {
+            value = type + "(" + value + ")";
+        }
+        let statement = type + " " + variableName + " = " + value;
+        this.editor.nodes.find(n => n.id == node.id).material.appendSourceLine(statement);
     }
 
+};
+
+export class ConstantFloat extends Constant {
+    constructor() {
+        super("ConstantFloat", 1);
+    }
+};
+
+export class ConstantVector2 extends Constant {
+    constructor() {
+        super("ConstantVector2", 2);
+    }
+};
+
+export class ConstantVector3 extends Constant {
+    constructor() {
+        super("ConstantVector3", 3);
+    }
+};
+
+export class ConstantVector4 extends Constant {
+    constructor() {
+        super("ConstantVector4", 4);
+    }
 };
 
 export class Geometry extends Rete.Component {
@@ -171,6 +218,10 @@ export class Geometry extends Rete.Component {
 
     worker(node, inputs, outputs) {
         outputs["position"] = {dimension: 3, variableName: "v_position"};
+        outputs["normal"] = {dimension: 3, variableName: "v_normal"};
+        outputs["tangent"] = {dimension: 3, variableName: "v_tangent"};
+        outputs["binormal"] = {dimension: 3, variableName: "v_binormal"};
+        outputs["uv0"] = {dimension: 2, variableName: "v_uv0"};
     }
 };
 
@@ -187,11 +238,88 @@ export class FragColor extends Rete.Component {
     worker(node, inputs, outputs) {
         let color = inputs["color"][0];
         let statement;
-        if(color !== undefined) {
-            statement = "gl_FragColor = " + color.variableName + ";\n";
+        if(color !== undefined && color.dimension === 4) {
+            statement = "gl_FragColor = " + color.variableName;
         }
         else {
-            statement = "gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);\n";
+            statement = "gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0)";
         }
+        this.editor.nodes.find(n => n.id == node.id).material.appendSourceLine(statement);
     }
+};
+
+class Script extends Rete.Component {
+    constructor(name) {
+        super("Script");
+    }
+
+    builder(node) {
+
+    }
+
+    worker(node, inputs, outputs) {
+
+    }
+
+    static compile(source) {
+        let functionName;
+        let parameters = [];
+        let returnedDimension;
+        let compiledSource;
+    }
+};
+
+
+export class Texture extends Rete.Component {
+    constructor() {
+        super("Texture");
+    }
+
+    builder(node) {
+        node.addInput(new Rete.Input("uv", "uv", anyTypeSocket));
+        node.addOutput(new Rete.Output("color", "color", anyTypeSocket));
+        node.addOutput(new Rete.Output("r", "r", anyTypeSocket));
+        node.addOutput(new Rete.Output("g", "g", anyTypeSocket));
+        node.addOutput(new Rete.Output("b", "b", anyTypeSocket));
+        node.addOutput(new Rete.Output("a", "a", anyTypeSocket));
+        node.addControl(new ImageSelectControl("textureMap", this.editor));
+        return node;
+    }
+
+    worker(node, inputs, outputs) {
+        let uv = inputs["uv"][0];
+        if(uv === undefined || uv.dimension !== 2) {
+            return;
+        }
+        if(node.data.textureMap === undefined) {
+            //return;
+        }
+        
+        let samplerName = this.name.toLowerCase() + "_" + node.id;
+        let uniform = "uniform sampler2D " + samplerName;
+        let variableName = samplerName + "_color";
+        let statement = "vec4 " + variableName + " = texture2D(" + samplerName + ", " + uv.variableName + ")";
+        let material = this.editor.nodes.find(n => n.id == node.id).material;
+        material.appendSourceLine(statement);
+        material.appendUniformLine(uniform);
+        outputs["color"] = {dimension: 4, variableName};
+        outputs["r"] = {dimension: 1, variableName: variableName + ".r"};
+        outputs["g"] = {dimension: 1, variableName: variableName + ".g"};
+        outputs["b"] = {dimension: 1, variableName: variableName + ".b"};
+        outputs["a"] = {dimension: 1, variableName: variableName + ".a"};
+    }
+};
+
+export class NormalMap extends Texture {
+    constructor() {
+
+    }
+
+    builder(node) {
+
+    }
+
+    worker(node, inputs, outputs) {
+
+    }    
 };

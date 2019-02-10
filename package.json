@@ -31,6 +31,7 @@
     "react": "^16.8.1",
     "react-dom": "^16.8.1",
     "rete": "^1.1.0",
-    "rete-connection-plugin": "^0.4.1"
+    "rete-connection-plugin": "^0.4.1",
+    "three": "^0.101.1"
   }
 }

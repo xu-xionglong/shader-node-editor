@@ -21,10 +21,11 @@ import ReactDOM from 'react-dom';
 import React from 'react';
 import Menu from './Menu'
 import MaterialWriter from './MaterialWriter'
+import * as THREE from 'three';
 
 
 export async function initRete() {
-    const container = document.querySelector('#rete');
+    const container = document.getElementById('rete');
     const editor = new Rete.NodeEditor('ShaderNode@0.0.1', container);
     const engine = await new Rete.Engine('ShaderNode@0.0.1');
 
@@ -72,17 +73,30 @@ export async function initRete() {
     editor.use(ConnectionPlugin)
     editor.use(ReactRenderPlugin)
 
-    
+    let textArea = document.getElementById("shader");
     editor.on('process nodecreated noderemoved connectioncreated connectionremoved', async () => {
         writer.reset();
         await engine.abort();
         await engine.process(editor.toJSON());
-        console.log(writer.generateShader());
+        textArea.value = writer.generateShader();
     });
 }
 
 function init() {
+    let container = document.getElementById("viewport");
+    let width = container.offsetWidth;
+    let height = container.offsetHeight
+    var _renderer = new THREE.WebGLRenderer({antialias:true});
+    _renderer.setPixelRatio(window.devicePixelRatio);
+    _renderer.setSize(width, height);
+    container.appendChild(_renderer.domElement);
 
+    var _scene = new THREE.Scene();
+    _scene.background = new THREE.Color(0xf0f0f0);
+    var _camera = new THREE.PerspectiveCamera(60, width / height, 0.01, 100);
+
+    _renderer.render(_scene, _camera);
 }
 
 initRete();
+init();

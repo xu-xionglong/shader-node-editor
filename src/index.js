@@ -23,6 +23,12 @@ import Menu from './Menu'
 import MaterialWriter from './MaterialWriter'
 import * as THREE from 'three';
 
+let _material;
+let _camera;
+let _scene;
+let _renderer;
+
+
 
 export async function initRete() {
     const container = document.getElementById('rete');
@@ -78,7 +84,11 @@ export async function initRete() {
         writer.reset();
         await engine.abort();
         await engine.process(editor.toJSON());
-        textArea.value = writer.generateShader();
+        let shader = writer.generateShader();
+        textArea.value = shader;
+        _material.fragmentShader = shader;
+        _material.needsUpdate = true;
+        _renderer.render(_scene, _camera);
     });
 }
 
@@ -86,17 +96,23 @@ function init() {
     let container = document.getElementById("viewport");
     let width = container.offsetWidth;
     let height = container.offsetHeight
-    var _renderer = new THREE.WebGLRenderer({antialias:true});
+    _renderer = new THREE.WebGLRenderer({antialias:true});
     _renderer.setPixelRatio(window.devicePixelRatio);
     _renderer.setSize(width, height);
     container.appendChild(_renderer.domElement);
 
-    var _scene = new THREE.Scene();
+    _scene = new THREE.Scene();
     _scene.background = new THREE.Color(0xf0f0f0);
-    var _camera = new THREE.PerspectiveCamera(60, width / height, 0.01, 100);
+    _camera = new THREE.PerspectiveCamera(60, width / height, 0.01, 100);
+    _camera.position.z = 15;
+
+    let geometry = new THREE.SphereGeometry(5, 32, 32);
+    _material = new THREE.ShaderMaterial({});
+    let sphere = new THREE.Mesh(geometry, _material);
+    _scene.add(sphere);
 
     _renderer.render(_scene, _camera);
 }
 
-initRete();
 init();
+initRete();

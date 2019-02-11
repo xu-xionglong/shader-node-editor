@@ -150,7 +150,18 @@ class Constant extends Rete.Component {
         super(name);
         this.dimension = dimension;
         this.formatChecker = (value) => {
-            //todo: check format
+            let numbers = value.split(",");
+            if(numbers.length !== this.dimension) {
+                return false;
+            }
+            const pattern = /^(-?\d+)(\.\d+)?$/;
+            for(let i = 0; i < numbers.length; ++ i) {
+                let numberStr = numbers[i];
+                let matchedString = pattern.exec(numberStr);
+                if(matchedString === null || matchedString[0] !== numberStr) {
+                    return false;
+                }
+            }
             return true;
         };
     }

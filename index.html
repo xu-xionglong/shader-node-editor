@@ -5,25 +5,28 @@
     <title>Shader-Node-Editor</title>
     <style>
         #rete {
-            width: 800px !important;
-            height: 600px !important;
+            width: 600px !important;
+            height: 720px !important;
             background: #f0f0f0;
+            display: inline-block;
         }
         #shader {
             width: 400px;
-            height: 600px;
+            height: 400px;
             display: inline-block;
         }
         #viewport {
-            width: 800px;
-            height: 600px;
+            width: 400px;
+            height: 300px;
         }
     </style>    
   </head>
   <body>
     <div id="rete"></div>
-    <textarea id="shader" disabled=""></textarea>
-    <div id="viewport">
+    <div style="display: inline-block;">
+        <textarea id="shader" disabled></textarea>
+        <div id="viewport">
+    </div>
     </div>
   <script type="text/javascript" src="main.js"></script></body>
 </html>

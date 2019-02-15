@@ -39,7 +39,7 @@ class Expression extends Rete.Component {
             let variableName = this.name.toLowerCase() + "_" + node.id;
             outputs[this.outputSocketName] = {variableName, dimension};
             let statement = typeMap[dimension - 1] + " " + variableName + " = " + this.format(inputVariableNames);
-            this.editor.nodes.find(n => n.id == node.id).material.appendSourceLine(statement);
+            this.editor.materialWriter.appendSourceLine(statement);
         }
     }
 
@@ -154,7 +154,13 @@ class Constant extends Rete.Component {
             if(numbers.length !== this.dimension) {
                 return false;
             }
-            const pattern = /^(-?\d+)(\.\d+)?$/;
+            let pattern
+            if(numbers.length === 1) {
+                pattern = /^(-?\d+)(\.\d+)$/;
+            }
+            else {
+                pattern = /^(-?\d+)(\.\d+)?$/;
+            }
             for(let i = 0; i < numbers.length; ++ i) {
                 let numberStr = numbers[i];
                 let matchedString = pattern.exec(numberStr);
@@ -184,7 +190,7 @@ class Constant extends Rete.Component {
             value = type + "(" + value + ")";
         }
         let statement = type + " " + variableName + " = " + value;
-        this.editor.nodes.find(n => n.id == node.id).material.appendSourceLine(statement);
+        this.editor.materialWriter.appendSourceLine(statement);
     }
 
 };
@@ -219,20 +225,16 @@ export class Geometry extends Rete.Component {
     }
 
     builder(node) {
-        node.addOutput(new Rete.Output("position", "position", anyTypeSocket));
+        node.addOutput(new Rete.Output("vViewPosition", "vViewPosition", anyTypeSocket));
         node.addOutput(new Rete.Output("normal", "normal", anyTypeSocket));
-        node.addOutput(new Rete.Output("tangent", "tangent", anyTypeSocket));
-        node.addOutput(new Rete.Output("binormal", "binormal", anyTypeSocket));
-        node.addOutput(new Rete.Output("uv0", "uv0", anyTypeSocket));
+        node.addOutput(new Rete.Output("vUv", "vUv", anyTypeSocket));
         return node;
     }
 
     worker(node, inputs, outputs) {
-        outputs["position"] = {dimension: 3, variableName: "v_position"};
-        outputs["normal"] = {dimension: 3, variableName: "v_normal"};
-        outputs["tangent"] = {dimension: 3, variableName: "v_tangent"};
-        outputs["binormal"] = {dimension: 3, variableName: "v_binormal"};
-        outputs["uv0"] = {dimension: 2, variableName: "v_uv0"};
+        outputs["vViewPosition"] = {dimension: 3, variableName: "vViewPosition"};
+        outputs["vNormal"] = {dimension: 3, variableName: "vNormal"};
+        outputs["vUv"] = {dimension: 2, variableName: "vUv"};
     }
 };
 
@@ -243,19 +245,30 @@ export class FragColor extends Rete.Component {
 
     builder(node) {
         node.addInput(new Rete.Input("color", "color", anyTypeSocket));
+        node.addInput(new Rete.Input("alpha", "alpha", anyTypeSocket));
         return node;
     }
 
     worker(node, inputs, outputs) {
         let color = inputs["color"][0];
+        let alpha = inputs["alpha"][0];
+        let alphaValid = alpha !== undefined && alpha.dimension === 1;
         let statement;
-        if(color !== undefined && color.dimension === 4) {
-            statement = "gl_FragColor = " + color.variableName;
+        if(color !== undefined && (color.dimension === 4 || (color.dimension === 3 && alphaValid))) {
+            if(!alphaValid) {
+                statement = "gl_FragColor = " + color.variableName;
+            }
+            else if(color.dimension === 4) {
+                statement = "gl_FragColor = vec4(" + color.variableName + ".rgb, " + alpha.variableName + ")"; 
+            }
+            else {
+                statement = "gl_FragColor = vec4(" + color.variableName + ", " + alpha.variableName + ")";
+            }
         }
         else {
             statement = "gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0)";
         }
-        this.editor.nodes.find(n => n.id == node.id).material.appendSourceLine(statement);
+        this.editor.materialWriter.appendSourceLine(statement);
     }
 };
 
@@ -293,7 +306,8 @@ export class Texture extends Rete.Component {
         node.addOutput(new Rete.Output("g", "g", anyTypeSocket));
         node.addOutput(new Rete.Output("b", "b", anyTypeSocket));
         node.addOutput(new Rete.Output("a", "a", anyTypeSocket));
-        node.addControl(new ImageSelectControl("textureMap", this.editor));
+        node.addControl(new ImageSelectControl(this.name.toLowerCase() + "_" + node.id, this.editor));
+        
         return node;
     }
 
@@ -302,15 +316,12 @@ export class Texture extends Rete.Component {
         if(uv === undefined || uv.dimension !== 2) {
             return;
         }
-        if(node.data.textureMap === undefined) {
-            //return;
-        }
         
         let samplerName = this.name.toLowerCase() + "_" + node.id;
         let uniform = "uniform sampler2D " + samplerName;
         let variableName = samplerName + "_color";
         let statement = "vec4 " + variableName + " = texture2D(" + samplerName + ", " + uv.variableName + ")";
-        let material = this.editor.nodes.find(n => n.id == node.id).material;
+        let material = this.editor.materialWriter;
         material.appendSourceLine(statement);
         material.appendUniformLine(uniform);
         outputs["color"] = {dimension: 4, variableName};
@@ -334,3 +345,50 @@ export class NormalMap extends Texture {
 
     }    
 };
+
+
+export class StandardModel extends Rete.Component {
+    constructor() {
+        super("StandardModel");
+    }
+
+    builder(node) {
+        node.addInput(new Rete.Input("baseColor", "baseColor", anyTypeSocket));
+        node.addInput(new Rete.Input("normal", "normal", anyTypeSocket));
+        node.addInput(new Rete.Input("metalness", "metalness", anyTypeSocket));
+        node.addInput(new Rete.Input("roughness", "roughness", anyTypeSocket));
+        //node.addInput(new Rete.Input("clearCoat", "clearCoat", anyTypeSocket));
+        //node.addInput(new Rete.Input("clearCoatRoughness", "clearCoatRoughness", anyTypeSocket));
+        //node.addInput(new Rete.Input("anisotropy", "anisotropy", anyTypeSocket));
+        //node.addInput(new Rete.Input("anisotropyDirection", "anisotropyDirection", anyTypeSocket));
+        //node.addInput(new Rete.Input("ambientOcclusion", "ambientOcclusion", anyTypeSocket));
+        //node.addInput(new Rete.Input("emissive", "emissive", anyTypeSocket));
+        node.addOutput(new Rete.Output("color", "color", anyTypeSocket));
+    }
+
+    worker(node, inputs, outputs) {
+        let baseColor = inputs["baseColor"][0];
+        let normal = inputs["normal"][0];
+        let metalness = inputs["metalness"][0];
+        let roughness = inputs["roughness"][0];
+        //let clearCoat = inputs["clearCoat"][0];
+        //let clearCoatRoughness = inputs["clearCoatRoughness"][0];
+        //let anisotropy = inputs["anisotropy"][0];
+        //let anisotropyDirection = inputs["anisotropyDirection"][0];
+        //let ambientOcclusion = inputs["ambientOcclusion"][0];
+        //let emissive = inputs["emissive"][0];
+        let necessaryInputs = {
+            baseColor,
+            normal,
+            metalness,
+            roughness
+        }
+        for(let i = 0; i < necessaryInputs.length; ++ i) {
+            if(necessaryInputs[i] === undefined) {
+                return;
+            }
+        }
+
+
+    }
+}

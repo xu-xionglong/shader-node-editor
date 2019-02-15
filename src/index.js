@@ -22,11 +22,13 @@ import React from 'react';
 import Menu from './Menu'
 import MaterialWriter from './MaterialWriter'
 import * as THREE from 'three';
+import OrbitControls from 'three-orbitcontrols'
 
 let _material;
 let _camera;
 let _scene;
 let _renderer;
+let _control;
 
 
 
@@ -36,11 +38,11 @@ export async function initRete() {
     const engine = await new Rete.Engine('ShaderNode@0.0.1');
 
     let writer = new MaterialWriter();
+    editor.materialWriter = writer;
     let menuCallback = (item) => {
         let promise = item.component.createNode();
         promise.then((node) => {
             editor.addNode(node);
-            node.material = writer;
         });
     };
     let menuItems = [
@@ -87,8 +89,9 @@ export async function initRete() {
         let shader = writer.generateShader();
         textArea.value = shader;
         _material.fragmentShader = shader;
+        _material.uniforms = writer.uniforms;
         _material.needsUpdate = true;
-        _renderer.render(_scene, _camera);
+        _material.uniformsNeedUpdate = true;
     });
 }
 
@@ -106,11 +109,22 @@ function init() {
     _camera = new THREE.PerspectiveCamera(60, width / height, 0.01, 100);
     _camera.position.z = 15;
 
+    _control = new OrbitControls(_camera, container);
+
     let geometry = new THREE.SphereGeometry(5, 32, 32);
-    _material = new THREE.ShaderMaterial({});
+    _material = new THREE.ShaderMaterial({
+        vertexShader: "varying vec2 vUv;\nvoid main() {\n\tgl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );\n\tvUv = uv;\n}"
+    });
     let sphere = new THREE.Mesh(geometry, _material);
     _scene.add(sphere);
 
+    update();
+}
+
+function update()
+{
+    requestAnimationFrame(update);
+    _control.update();
     _renderer.render(_scene, _camera);
 }
 

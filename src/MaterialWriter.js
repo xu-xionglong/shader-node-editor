@@ -1,12 +1,14 @@
 export default class MaterialWriter {
 	constructor() {
 		this.reset();
+		this.uniforms = {};
 	}
 
 	reset() {
 		this.sourceChunk = "";
 		this.functionChunk = "";
 		this.uniformChunk = "";
+		this.varyingChunk = "varying vec2 vUv;\n"
 		this.enableNormalMap = false;
 	}
 
@@ -21,6 +23,7 @@ export default class MaterialWriter {
 	generateShader() {
 		let fragmentShader = [
 			this.uniformChunk,
+			this.varyingChunk,
 			"void main() {\n",
 			this.sourceChunk,
 			"}"

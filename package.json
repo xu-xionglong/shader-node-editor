@@ -20,6 +20,7 @@
     "babel-loader": "^8.0.5",
     "clean-webpack-plugin": "^1.0.1",
     "css-loader": "^2.1.0",
+    "file-loader": "^3.0.1",
     "html-webpack-plugin": "^3.2.0",
     "style-loader": "^0.23.1",
     "webpack": "^4.29.3",
@@ -32,6 +33,7 @@
     "react-dom": "^16.8.1",
     "rete": "^1.1.0",
     "rete-connection-plugin": "^0.4.1",
-    "three": "^0.101.1"
+    "three": "^0.101.1",
+    "three-orbitcontrols": "^2.101.1"
   }
 }

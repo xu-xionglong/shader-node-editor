@@ -39,7 +39,7 @@ class Expression extends Rete.Component {
             let variableName = this.name.toLowerCase() + "_" + node.id;
             outputs[this.outputSocketName] = {variableName, dimension};
             let statement = typeMap[dimension - 1] + " " + variableName + " = " + this.format(inputVariableNames);
-            this.editor.materialWriter.appendSourceLine(statement);
+            this.editor.materialWriter.appendFragmentSourceLine(statement);
         }
     }
 
@@ -190,7 +190,7 @@ class Constant extends Rete.Component {
             value = type + "(" + value + ")";
         }
         let statement = type + " " + variableName + " = " + value;
-        this.editor.materialWriter.appendSourceLine(statement);
+        this.editor.materialWriter.appendFragmentSourceLine(statement);
     }
 
 };
@@ -225,16 +225,26 @@ export class Geometry extends Rete.Component {
     }
 
     builder(node) {
-        node.addOutput(new Rete.Output("vViewPosition", "vViewPosition", anyTypeSocket));
+        node.addOutput(new Rete.Output("position", "position", anyTypeSocket));
         node.addOutput(new Rete.Output("normal", "normal", anyTypeSocket));
-        node.addOutput(new Rete.Output("vUv", "vUv", anyTypeSocket));
+        node.addOutput(new Rete.Output("uv0", "uv0", anyTypeSocket));
         return node;
     }
 
     worker(node, inputs, outputs) {
-        outputs["vViewPosition"] = {dimension: 3, variableName: "vViewPosition"};
-        outputs["vNormal"] = {dimension: 3, variableName: "vNormal"};
-        outputs["vUv"] = {dimension: 2, variableName: "vUv"};
+        outputs["position"] = {dimension: 3, variableName: "vViewPosition"};
+        outputs["normal"] = {dimension: 3, variableName: "vNormal"};
+        outputs["uv0"] = {dimension: 2, variableName: "vUv"};
+
+        if(node.outputs.normal.connections.length > 0) {
+            this.editor.materialWriter.enableNormal = true;
+        }
+        if(node.outputs.uv0.connections.length > 0) {
+            this.editor.materialWriter.enableUV = true;
+        }
+        if(node.outputs.position.connections.length > 0) {
+            this.editor.materialWriter.enablePosition = true;
+        }
     }
 };
 
@@ -254,21 +264,28 @@ export class FragColor extends Rete.Component {
         let alpha = inputs["alpha"][0];
         let alphaValid = alpha !== undefined && alpha.dimension === 1;
         let statement;
-        if(color !== undefined && (color.dimension === 4 || (color.dimension === 3 && alphaValid))) {
-            if(!alphaValid) {
-                statement = "gl_FragColor = " + color.variableName;
-            }
-            else if(color.dimension === 4) {
-                statement = "gl_FragColor = vec4(" + color.variableName + ".rgb, " + alpha.variableName + ")"; 
+        if(color !== undefined && color.dimension >= 3) {
+            if(alphaValid) {
+                if(color.dimension === 3) {
+                    statement = "gl_FragColor = vec4(" + color.variableName + ", " + alpha.variableName + ")";
+                }
+                else {
+                    statement = "gl_FragColor = vec4(" + color.variableName + ".rgb, " + alpha.variableName + ")"; 
+                }
             }
             else {
-                statement = "gl_FragColor = vec4(" + color.variableName + ", " + alpha.variableName + ")";
+                if(color.dimension === 3) {
+                    statement = "gl_FragColor = vec4(" + color.variableName + ", 1.0)";
+                }
+                else {
+                    statement = "gl_FragColor = " + color.variableName;
+                }
             }
         }
         else {
             statement = "gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0)";
         }
-        this.editor.materialWriter.appendSourceLine(statement);
+        this.editor.materialWriter.appendFragmentSourceLine(statement);
     }
 };
 
@@ -306,6 +323,7 @@ export class Texture extends Rete.Component {
         node.addOutput(new Rete.Output("g", "g", anyTypeSocket));
         node.addOutput(new Rete.Output("b", "b", anyTypeSocket));
         node.addOutput(new Rete.Output("a", "a", anyTypeSocket));
+        node.addOutput(new Rete.Output("rgb", "rgb", anyTypeSocket));
         node.addControl(new ImageSelectControl(this.name.toLowerCase() + "_" + node.id, this.editor));
         
         return node;
@@ -322,39 +340,55 @@ export class Texture extends Rete.Component {
         let variableName = samplerName + "_color";
         let statement = "vec4 " + variableName + " = texture2D(" + samplerName + ", " + uv.variableName + ")";
         let material = this.editor.materialWriter;
-        material.appendSourceLine(statement);
-        material.appendUniformLine(uniform);
+        material.appendFragmentSourceLine(statement);
+        material.appendFragmentUniformLine(uniform);
         outputs["color"] = {dimension: 4, variableName};
         outputs["r"] = {dimension: 1, variableName: variableName + ".r"};
         outputs["g"] = {dimension: 1, variableName: variableName + ".g"};
         outputs["b"] = {dimension: 1, variableName: variableName + ".b"};
         outputs["a"] = {dimension: 1, variableName: variableName + ".a"};
+        outputs["rgb"] = {dimension: 3, variableName: variableName + ".rgb"};
     }
 };
 
-export class NormalMap extends Texture {
+export class NormalMap extends Rete.Component {
     constructor() {
-
+        super("NormalMap");
     }
 
     builder(node) {
-
+        node.addInput(new Rete.Input("uv", "uv", anyTypeSocket));
+        node.addOutput(new Rete.Output("normal", "normal", anyTypeSocket));
+        node.addControl(new ImageSelectControl(this.name.toLowerCase() + "_" + node.id, this.editor));
+        return node;
     }
 
     worker(node, inputs, outputs) {
-
+        let uv = inputs["uv"][0];
+        if(uv === undefined || uv.dimension !== 2) {
+            return;
+        }
+        let samplerName = this.name.toLowerCase() + "_" + node.id;
+        let uniform = "uniform sampler2D " + samplerName;
+        let variableName = samplerName + "_normal";
+        let statement = "vec4 " + variableName + " = perturbNormal2Arb(vViewPosition, vNormal, texture2D(" + samplerName + ", " + uv.variableName +").xyz)";
+        let material = this.editor.materialWriter;
+        material.appendFragmentSourceLine(statement);
+        material.enableNormal = true;
+        material.enablePosition = true;
+        material.enableNormalMap = true;
+        outputs["normal"] = {dimension: 3, variableName};
     }    
 };
 
 
-export class StandardModel extends Rete.Component {
+export class PhysicalBased extends Rete.Component {
     constructor() {
-        super("StandardModel");
+        super("PhysicalBased");
     }
 
     builder(node) {
         node.addInput(new Rete.Input("baseColor", "baseColor", anyTypeSocket));
-        node.addInput(new Rete.Input("normal", "normal", anyTypeSocket));
         node.addInput(new Rete.Input("metalness", "metalness", anyTypeSocket));
         node.addInput(new Rete.Input("roughness", "roughness", anyTypeSocket));
         //node.addInput(new Rete.Input("clearCoat", "clearCoat", anyTypeSocket));
@@ -363,6 +397,7 @@ export class StandardModel extends Rete.Component {
         //node.addInput(new Rete.Input("anisotropyDirection", "anisotropyDirection", anyTypeSocket));
         //node.addInput(new Rete.Input("ambientOcclusion", "ambientOcclusion", anyTypeSocket));
         //node.addInput(new Rete.Input("emissive", "emissive", anyTypeSocket));
+        node.addInput(new Rete.Input("normal", "normal", anyTypeSocket));
         node.addOutput(new Rete.Output("color", "color", anyTypeSocket));
     }
 
@@ -388,7 +423,88 @@ export class StandardModel extends Rete.Component {
                 return;
             }
         }
-
+        this.editor.materialWriter.enableLight = true;
 
     }
+};
+
+export class BlinnPhong extends Rete.Component {
+    constructor() {
+        super("BlinnPhong");
+    }
+    builder(node) {
+        node.addInput(new Rete.Input("baseColor", "baseColor", anyTypeSocket));
+        node.addInput(new Rete.Input("shininess", "shininess", anyTypeSocket));
+        node.addInput(new Rete.Input("normal", "normal", anyTypeSocket));
+        node.addOutput(new Rete.Output("color", "color", anyTypeSocket));
+        return node;
+    }
+    worker(node, inputs, outputs) {
+        /*if(true) {
+            let baseColor = inputs["baseColor"][0];
+            if(baseColor === undefined || baseColor.dimension !== 3) {
+                return;
+            }
+            let variableName = this.name.toLowerCase() + "_" + node.id;
+            outputs["color"] = {dimension: 3, variableName};
+            let material = this.editor.materialWriter;
+            let statement = `vec3 ${variableName} = ${baseColor.variableName}`
+            material.appendFragmentSourceLine(statement);
+            return;
+        }*/
+        
+
+
+        let baseColor = inputs["baseColor"][0];
+        let normal = inputs["normal"][0];
+        let shininess = inputs["shininess"][0];
+        if(baseColor === undefined || baseColor.dimension !== 3) {
+            return;
+        }
+        if(normal === undefined || normal.dimension !== 3) {
+            return;
+        }
+        if(shininess === undefined || shininess.dimension !== 1) {
+            return;
+        }
+        let functionSource = `
+void redirectBlinnPhong(vec3 lightDirection, vec3 lightColor,
+                        vec3 normal, vec3 viewDirection,
+                        vec3 baseColor, float shininess,
+                        inout vec3 diffuseColor, inout vec3 specularColor)
+{
+    float dotNL = saturate(dot(normal, lightDirection));
+    vec3 halfDirection = normalize(lightDirection + viewDirection);
+    float dotNH = saturate(dot(normal, halfDirection));
+    diffuseColor += dotNL * lightColor * baseColor;
+    specularColor += vec3(pow(dotNH, shininess));
+
 }
+vec3 blinnPhong(vec3 baseColor, float shininess, vec3 normal)
+{
+    vec3 diffuseColor;
+    vec3 specularColor;
+#if ( NUM_DIR_LIGHTS > 0 )
+    DirectionalLight directionalLight;
+    #pragma unroll_loop
+    for(int i = 0; i < NUM_DIR_LIGHTS; i ++) {
+        directionalLight = directionalLights[i];
+        redirectBlinnPhong(directionalLight.direction, directionalLight.color,
+                           normal, normalize(-vViewPosition),
+                           baseColor, shininess,
+                           diffuseColor, specularColor);
+    }
+#endif
+    return diffuseColor + specularColor;
+}
+`;
+        let variableName = this.name.toLowerCase() + "_" + node.id;
+        let statement = `vec3 ${variableName} = blinnPhong(${baseColor.variableName}, ${shininess.variableName}, ${normal.variableName})`;
+        let material = this.editor.materialWriter;
+        material.enableLight = true;
+        material.enablePosition = true;
+        material.appendFragmentSourceLine(statement);
+        material.fragmentFunctionChunk += functionSource;
+        outputs["color"] = {dimension: 3, variableName};
+    }
+};

@@ -16,6 +16,7 @@ import {
     Cross,
     Mix,
     Texture,
+    BlinnPhong,
 } from "./Components"
 import ReactDOM from 'react-dom';
 import React from 'react';
@@ -59,7 +60,8 @@ export async function initRete() {
         {name: "ConstantVector2", component: new ConstantVector2()},
         {name: "ConstantVector3", component: new ConstantVector3()},
         {name: "ConstantVector4", component: new ConstantVector4()},
-        {name: "Texture", component: new Texture()}
+        {name: "Texture", component: new Texture()},
+        {name: "BlinnPhong", component: new BlinnPhong()}
     ];
     menuItems.forEach((item) => {
         editor.register(item.component);
@@ -83,13 +85,15 @@ export async function initRete() {
 
     let textArea = document.getElementById("shader");
     editor.on('process nodecreated noderemoved connectioncreated connectionremoved', async () => {
-        writer.reset();
+        writer.resetSource();
         await engine.abort();
         await engine.process(editor.toJSON());
-        let shader = writer.generateShader();
-        textArea.value = shader;
-        _material.fragmentShader = shader;
-        _material.uniforms = writer.uniforms;
+        let material = writer.generateMaterial();
+        textArea.value = material.vertexShader + "\n" + material.fragmentShader;
+        _material.vertexShader = material.vertexShader
+        _material.fragmentShader = material.fragmentShader;
+        _material.uniforms = material.uniforms;
+        _material.lights = writer.enableLight;
         _material.needsUpdate = true;
         _material.uniformsNeedUpdate = true;
     });
@@ -105,18 +109,22 @@ function init() {
     container.appendChild(_renderer.domElement);
 
     _scene = new THREE.Scene();
+    _scene.add(new THREE.AmbientLight(0x404040));
     _scene.background = new THREE.Color(0xf0f0f0);
     _camera = new THREE.PerspectiveCamera(60, width / height, 0.01, 100);
     _camera.position.z = 15;
 
     _control = new OrbitControls(_camera, container);
+    _control.enableKeys = false
 
     let geometry = new THREE.SphereGeometry(5, 32, 32);
-    _material = new THREE.ShaderMaterial({
-        vertexShader: "varying vec2 vUv;\nvoid main() {\n\tgl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );\n\tvUv = uv;\n}"
-    });
+    _material = new THREE.ShaderMaterial();
     let sphere = new THREE.Mesh(geometry, _material);
     _scene.add(sphere);
+
+    let directionalLight = new THREE.DirectionalLight();
+    directionalLight.position.set(0, 1, 0);
+    _scene.add(directionalLight);
 
     update();
 }

@@ -358,6 +358,7 @@ export class NormalMap extends Rete.Component {
 
     builder(node) {
         node.addInput(new Rete.Input("uv", "uv", anyTypeSocket));
+        node.addInput(new Rete.Input("normalScale", "normalScale", anyTypeSocket));
         node.addOutput(new Rete.Output("normal", "normal", anyTypeSocket));
         node.addControl(new ImageSelectControl(this.name.toLowerCase() + "_" + node.id, this.editor));
         return node;
@@ -365,15 +366,20 @@ export class NormalMap extends Rete.Component {
 
     worker(node, inputs, outputs) {
         let uv = inputs["uv"][0];
+        let normalScale = inputs["normalScale"][0];
         if(uv === undefined || uv.dimension !== 2) {
+            return;
+        }
+        if(normalScale !== undefined && normalScale.dimension !== 1) {
             return;
         }
         let samplerName = this.name.toLowerCase() + "_" + node.id;
         let uniform = "uniform sampler2D " + samplerName;
-        let variableName = samplerName + "_normal";
-        let statement = "vec4 " + variableName + " = perturbNormal2Arb(vViewPosition, vNormal, texture2D(" + samplerName + ", " + uv.variableName +").xyz)";
+        let variableName = `normal_${node.id}`;
+        let statement = `vec3 ${variableName} = perturbNormal2Arb(vViewPosition, vNormal, texture2D(${samplerName}, ${uv.variableName}).xyz, ${normalScale !== undefined ? normalScale.variableName : "1.0"})`;
         let material = this.editor.materialWriter;
         material.appendFragmentSourceLine(statement);
+        material.appendFragmentUniformLine(uniform);
         material.enableNormal = true;
         material.enablePosition = true;
         material.enableNormalMap = true;
@@ -440,21 +446,6 @@ export class BlinnPhong extends Rete.Component {
         return node;
     }
     worker(node, inputs, outputs) {
-        /*if(true) {
-            let baseColor = inputs["baseColor"][0];
-            if(baseColor === undefined || baseColor.dimension !== 3) {
-                return;
-            }
-            let variableName = this.name.toLowerCase() + "_" + node.id;
-            outputs["color"] = {dimension: 3, variableName};
-            let material = this.editor.materialWriter;
-            let statement = `vec3 ${variableName} = ${baseColor.variableName}`
-            material.appendFragmentSourceLine(statement);
-            return;
-        }*/
-        
-
-
         let baseColor = inputs["baseColor"][0];
         let normal = inputs["normal"][0];
         let shininess = inputs["shininess"][0];
@@ -484,6 +475,7 @@ vec3 blinnPhong(vec3 baseColor, float shininess, vec3 normal)
 {
     vec3 diffuseColor;
     vec3 specularColor;
+    vec3 ambientColor = baseColor * ambientLightColor;
 #if ( NUM_DIR_LIGHTS > 0 )
     DirectionalLight directionalLight;
     #pragma unroll_loop
@@ -495,7 +487,7 @@ vec3 blinnPhong(vec3 baseColor, float shininess, vec3 normal)
                            diffuseColor, specularColor);
     }
 #endif
-    return diffuseColor + specularColor;
+    return ambientColor + diffuseColor + specularColor;
 }
 `;
         let variableName = this.name.toLowerCase() + "_" + node.id;

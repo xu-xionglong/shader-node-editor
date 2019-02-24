@@ -29,7 +29,7 @@ export default class MaterialWriter {
 		let varyingChunk = "";
 		if(this.enableUV) varyingChunk += "varying vec2 vUv;\n";
 		if(this.enableNormal) varyingChunk += "varying vec3 vNormal;\n";
-		if(this.enablePosition) varyingChunk += "varying vec3 vViewPosition;"
+		if(this.enablePosition) varyingChunk += "varying vec3 vViewPosition;\n"
 
 		let vertexShader = [
 			varyingChunk,
@@ -45,7 +45,8 @@ export default class MaterialWriter {
 		let uniforms = this.uniforms;
 		let fragmentBuiltinChunk = "";
 		if(this.enableLight) {
-			fragmentBuiltinChunk += `#if NUM_DIR_LIGHTS > 0
+			fragmentBuiltinChunk += `uniform vec3 ambientLightColor;
+#if NUM_DIR_LIGHTS > 0
 struct DirectionalLight {
 	vec3 direction;
 	vec3 color;
@@ -62,7 +63,7 @@ uniform DirectionalLight directionalLights[NUM_DIR_LIGHTS];
 		}
 		if(this.enableNormalMap) {
 			fragmentBuiltinChunk += `
-vec3 perturbNormal2Arb( vec3 eye_pos, vec3 surf_norm, vec3 frag_norm ) {
+vec3 perturbNormal2Arb( vec3 eye_pos, vec3 surf_norm, vec3 frag_norm, float normalScale) {
 	vec3 q0 = vec3( dFdx( eye_pos.x ), dFdx( eye_pos.y ), dFdx( eye_pos.z ) );
 	vec3 q1 = vec3( dFdy( eye_pos.x ), dFdy( eye_pos.y ), dFdy( eye_pos.z ) );
 	vec2 st0 = dFdx( vUv.st );
@@ -80,9 +81,9 @@ vec3 perturbNormal2Arb( vec3 eye_pos, vec3 surf_norm, vec3 frag_norm ) {
 `;
 		}
 		let fragmentShader = [
-			fragmentBuiltinChunk,
 			this.fragmentUniformChunk,
 			varyingChunk,
+			fragmentBuiltinChunk,
 			this.fragmentFunctionChunk,
 			"void main() {\n",
 			this.fragmentSourceChunk,

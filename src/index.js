@@ -1,23 +1,7 @@
 import Rete from 'rete';
 import ConnectionPlugin from 'rete-connection-plugin';
 import ReactRenderPlugin from "./rete-react-render-plugin";
-import {
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Geometry,
-    FragColor,
-    ConstantFloat,
-    ConstantVector2,
-    ConstantVector3,
-    ConstantVector4,
-    Dot,
-    Cross,
-    Mix,
-    Texture,
-    BlinnPhong,
-} from "./Components"
+import * as Components from "./Components"
 import ReactDOM from 'react-dom';
 import React from 'react';
 import Menu from './Menu'
@@ -47,21 +31,22 @@ export async function initRete() {
         });
     };
     let menuItems = [
-        {name: "Add", component: new Add()},
-        {name: "Subtract", component: new Subtract()},
-        {name: "Multiply", component: new Multiply()},
-        {name: "Divide", component: new Divide()},
-        {name: "Dot", component: new Dot()},
-        {name: "Cross", component: new Cross()},
-        {name: "Mix", component: new Mix()},
-        {name: "Geometry", component: new Geometry()},
-        {name: "FragColor", component: new FragColor()},
-        {name: "ConstantFloat", component: new ConstantFloat()},
-        {name: "ConstantVector2", component: new ConstantVector2()},
-        {name: "ConstantVector3", component: new ConstantVector3()},
-        {name: "ConstantVector4", component: new ConstantVector4()},
-        {name: "Texture", component: new Texture()},
-        {name: "BlinnPhong", component: new BlinnPhong()}
+        {name: "Add", component: new Components.Add()},
+        {name: "Subtract", component: new Components.Subtract()},
+        {name: "Multiply", component: new Components.Multiply()},
+        {name: "Divide", component: new Components.Divide()},
+        {name: "Dot", component: new Components.Dot()},
+        {name: "Cross", component: new Components.Cross()},
+        {name: "Mix", component: new Components.Mix()},
+        {name: "Geometry", component: new Components.Geometry()},
+        {name: "FragColor", component: new Components.FragColor()},
+        {name: "ConstantFloat", component: new Components.ConstantFloat()},
+        {name: "ConstantVector2", component: new Components.ConstantVector2()},
+        {name: "ConstantVector3", component: new Components.ConstantVector3()},
+        {name: "ConstantVector4", component: new Components.ConstantVector4()},
+        {name: "Texture", component: new Components.Texture()},
+        {name: "BlinnPhong", component: new Components.BlinnPhong()},
+        {name: "NormalMap", component: new Components.NormalMap()}
     ];
     menuItems.forEach((item) => {
         editor.register(item.component);
@@ -83,17 +68,28 @@ export async function initRete() {
     editor.use(ConnectionPlugin)
     editor.use(ReactRenderPlugin)
 
-    let textArea = document.getElementById("shader");
+    let vertexTextArea = document.getElementById("vertexShader");
+    let fragmentTextArea = document.getElementById("fragmentShader")
+    vertexTextArea.onchange = () => {
+        _material.vertexShader = vertexTextArea.value;
+        _material.needsUpdate = true;
+    };
+    fragmentShader.onchange = () => {
+        _material.fragmentShader = fragmentTextArea.value;
+        _material.needsUpdate = true;
+    }
     editor.on('process nodecreated noderemoved connectioncreated connectionremoved', async () => {
         writer.resetSource();
         await engine.abort();
         await engine.process(editor.toJSON());
         let material = writer.generateMaterial();
-        textArea.value = material.vertexShader + "\n" + material.fragmentShader;
+        vertexTextArea.value = material.vertexShader;
+        fragmentTextArea.value = material.fragmentShader;
         _material.vertexShader = material.vertexShader
         _material.fragmentShader = material.fragmentShader;
         _material.uniforms = material.uniforms;
         _material.lights = writer.enableLight;
+        _material.extensions.derivatives = writer.enableNormalMap;
         _material.needsUpdate = true;
         _material.uniformsNeedUpdate = true;
     });

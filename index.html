@@ -11,9 +11,17 @@
             display: inline-block;
         }
         #shader {
-            width: 400px;
-            height: 400px;
             display: inline-block;
+        }
+        #vertexShader {
+            width: 400px;
+            height: 200px;
+            display: block;
+        }
+        #fragmentShader {
+            width: 400px;
+            height: 200px;
+            display: block;
         }
         #viewport {
             width: 400px;
@@ -24,7 +32,10 @@
   <body>
     <div id="rete"></div>
     <div style="display: inline-block;">
-        <textarea id="shader" disabled></textarea>
+        <div id="shader">
+            <textarea id="vertexShader"></textarea>
+            <textarea id="fragmentShader"></textarea>
+        </div>
         <div id="viewport">
     </div>
     </div>

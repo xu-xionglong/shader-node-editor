@@ -68,7 +68,7 @@ vec3 perturbNormal2Arb( vec3 eye_pos, vec3 surf_norm, vec3 frag_norm, float norm
 	vec3 q1 = vec3( dFdy( eye_pos.x ), dFdy( eye_pos.y ), dFdy( eye_pos.z ) );
 	vec2 st0 = dFdx( vUv.st );
 	vec2 st1 = dFdy( vUv.st );
-	float scale = sign( st1.t * st0.s - st0.t * st1.s ); // we do not care about the magnitude
+	float scale = sign( st1.t * st0.s - st0.t * st1.s );
 	vec3 S = normalize( ( q0 * st1.t - q1 * st0.t ) * scale );
 	vec3 T = normalize( ( - q0 * st1.s + q1 * st0.s ) * scale );
 	vec3 N = normalize( surf_norm );

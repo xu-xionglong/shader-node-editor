@@ -1,0 +1,14 @@
+:root {
+	--context-color: rgba(110,136,255,0.8);
+	--context-menu-round: 5px;
+	--width: 140px;
+}
+
+.item {
+	color: #fff;
+	padding: 4px;
+	border-bottom: 1px solid;
+	background-color: var(--context-color);
+	cursor: pointer;
+	width: var(--width);
+}

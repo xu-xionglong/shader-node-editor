@@ -8,6 +8,8 @@ import Menu from './Menu'
 import MaterialWriter from './MaterialWriter'
 import * as THREE from 'three';
 import OrbitControls from 'three-orbitcontrols'
+import TransformControls from './TransformControls'
+
 
 let _material;
 let _camera;
@@ -46,7 +48,8 @@ export async function initRete() {
         {name: "ConstantVector4", component: new Components.ConstantVector4()},
         {name: "Texture", component: new Components.Texture()},
         {name: "BlinnPhong", component: new Components.BlinnPhong()},
-        {name: "NormalMap", component: new Components.NormalMap()}
+        {name: "NormalMap", component: new Components.NormalMap()},
+        {name: "PhysicalBased", component: new Components.PhysicalBased()}
     ];
     menuItems.forEach((item) => {
         editor.register(item.component);
@@ -105,7 +108,7 @@ function init() {
     container.appendChild(_renderer.domElement);
 
     _scene = new THREE.Scene();
-    _scene.add(new THREE.AmbientLight(0x404040));
+    _scene.add(new THREE.AmbientLight());
     _scene.background = new THREE.Color(0xf0f0f0);
     _camera = new THREE.PerspectiveCamera(60, width / height, 0.01, 100);
     _camera.position.z = 15;
@@ -113,14 +116,27 @@ function init() {
     _control = new OrbitControls(_camera, container);
     _control.enableKeys = false
 
-    let geometry = new THREE.SphereGeometry(5, 32, 32);
+    let geometry = new THREE.SphereGeometry(5, 64, 64);
     _material = new THREE.ShaderMaterial();
     let sphere = new THREE.Mesh(geometry, _material);
     _scene.add(sphere);
 
-    let directionalLight = new THREE.DirectionalLight();
-    directionalLight.position.set(0, 1, 0);
-    _scene.add(directionalLight);
+    let lightDirs = [
+        new THREE.Vector3(0, 0, 15),
+        new THREE.Vector3(0, 15, 0)
+    ];
+    lightDirs.forEach((dir) => {
+        let light = new THREE.DirectionalLight();
+        light.position.copy(dir);
+        _scene.add(light);
+        let control = new THREE.TransformControls(_camera, container);
+        control.attach(light);
+        _scene.add(control);
+        control.addEventListener('dragging-changed', function(event) {
+            _control.enabled = !event.value;
+        });
+    });
+
 
     update();
 }

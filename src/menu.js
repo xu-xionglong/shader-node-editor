@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import './menu.css'
 
 
 export default class Menu extends React.Component {
@@ -15,7 +16,7 @@ export default class Menu extends React.Component {
 	render() {
 		let items = this.props.items.map((item) => {
 			return (
-				<div onClick={() => { this.props.callback(item); this.hide(); }}>
+				<div onClick={() => {this.props.callback(item); this.hide();}} className="item">
 					{item.name}
 				</div>
 			);

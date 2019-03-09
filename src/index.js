@@ -32,28 +32,46 @@ export async function initRete() {
             editor.addNode(node);
         });
     };
+
     let menuItems = [
-        {name: "Add", component: new Components.Add()},
-        {name: "Subtract", component: new Components.Subtract()},
-        {name: "Multiply", component: new Components.Multiply()},
-        {name: "Divide", component: new Components.Divide()},
-        {name: "Dot", component: new Components.Dot()},
-        {name: "Cross", component: new Components.Cross()},
-        {name: "Mix", component: new Components.Mix()},
+            {name: "Math", subItems: [
+            {name: "Add", component: new Components.Add()},
+            {name: "Subtract", component: new Components.Subtract()},
+            {name: "Multiply", component: new Components.Multiply()},
+            {name: "Divide", component: new Components.Divide()},
+            {name: "Dot", component: new Components.Dot()},
+            {name: "Cross", component: new Components.Cross()},
+            {name: "Mix", component: new Components.Mix()}
+        ]},
+        {name: "Constant", subItems: [
+            {name: "ConstantFloat", component: new Components.ConstantFloat()},
+            {name: "ConstantVector2", component: new Components.ConstantVector2()},
+            {name: "ConstantVector3", component: new Components.ConstantVector3()},
+            {name: "ConstantVector4", component: new Components.ConstantVector4()}
+        ]},
+        {name: "ShadingModel", subItems: [
+            {name: "BlinnPhong", component: new Components.BlinnPhong()},
+            {name: "PhysicalBased", component: new Components.PhysicalBased()}
+        ]},
+        {name: "Map", subItems: [
+            {name: "Texture", component: new Components.Texture()},
+            {name: "NormalMap", component: new Components.NormalMap()},
+        ]},
         {name: "Geometry", component: new Components.Geometry()},
-        {name: "FragColor", component: new Components.FragColor()},
-        {name: "ConstantFloat", component: new Components.ConstantFloat()},
-        {name: "ConstantVector2", component: new Components.ConstantVector2()},
-        {name: "ConstantVector3", component: new Components.ConstantVector3()},
-        {name: "ConstantVector4", component: new Components.ConstantVector4()},
-        {name: "Texture", component: new Components.Texture()},
-        {name: "BlinnPhong", component: new Components.BlinnPhong()},
-        {name: "NormalMap", component: new Components.NormalMap()},
-        {name: "PhysicalBased", component: new Components.PhysicalBased()}
+        {name: "FragColor", component: new Components.FragColor()}
     ];
+
+    let registerComponent = (item) => {
+        if(item.subItems !== undefined) {
+            item.subItems.forEach(registerComponent);
+        }
+        else {
+            editor.register(item.component);
+            engine.register(item.component);
+        }
+    };
     menuItems.forEach((item) => {
-        editor.register(item.component);
-        engine.register(item.component);
+        registerComponent(item);
     });
     let el = document.createElement("div");
     editor.view.container.appendChild(el);

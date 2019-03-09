@@ -5,10 +5,24 @@
 }
 
 .item {
+	position: relative;
 	color: #fff;
 	padding: 4px;
 	border-bottom: 1px solid;
+	border-left: 1px solid;
 	background-color: var(--context-color);
 	cursor: pointer;
 	width: var(--width);
+}
+
+.menu {
+	display: none;
+	position: absolute;
+	left: 100%;
+	top: 0;
+}
+
+
+.item:hover .menu {
+	display: block;
 }

@@ -86,6 +86,7 @@ vec3 perturbNormal2Arb( vec3 eye_pos, vec3 surf_norm, vec3 frag_norm, float norm
 			fragmentBuiltinChunk,
 			this.fragmentFunctionChunk,
 			"void main() {\n",
+			this.enableNormal ? "\tvec3 normal = normalize(vNormal);\n" : "",
 			this.fragmentSourceChunk,
 			"}"
 		].join("");

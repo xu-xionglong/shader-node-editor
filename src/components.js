@@ -233,7 +233,7 @@ export class Geometry extends Rete.Component {
 
     worker(node, inputs, outputs) {
         outputs["position"] = {dimension: 3, variableName: "vViewPosition"};
-        outputs["normal"] = {dimension: 3, variableName: "vNormal"};
+        outputs["normal"] = {dimension: 3, variableName: "normal"};
         outputs["uv0"] = {dimension: 2, variableName: "vUv"};
 
         if(node.outputs.normal.connections.length > 0) {
@@ -376,7 +376,7 @@ export class NormalMap extends Rete.Component {
         let samplerName = this.name.toLowerCase() + "_" + node.id;
         let uniform = "uniform sampler2D " + samplerName;
         let variableName = `normal_${node.id}`;
-        let statement = `vec3 ${variableName} = perturbNormal2Arb(vViewPosition, vNormal, texture2D(${samplerName}, ${uv.variableName}).xyz, ${normalScale !== undefined ? normalScale.variableName : "1.0"})`;
+        let statement = `vec3 ${variableName} = perturbNormal2Arb(vViewPosition, normal, texture2D(${samplerName}, ${uv.variableName}).xyz, ${normalScale !== undefined ? normalScale.variableName : "1.0"})`;
         let material = this.editor.materialWriter;
         material.appendFragmentSourceLine(statement);
         material.appendFragmentUniformLine(uniform);
@@ -493,10 +493,10 @@ void redirectPhysicalBased(const in PhysicalMaterial material, const in Incident
     vec3 F = F_Schlick(f0, dotLH);
     float G = G_GGX_SmithCorrelated(alpha, dotNL, dotNV);
     float D = D_GGX(alpha, dotNH);
-    reflectedLight.directSpecular += F * (G * D) * incidentLight.color;
+    reflectedLight.directSpecular += F * (G * D) * incidentLight.color * dotNL;
 
     vec3 diffuseColor = (1.0 - material.metalness) * material.baseColor;
-    reflectedLight.directDiffuse += diffuseColor * incidentLight.color;
+    reflectedLight.directDiffuse += diffuseColor * incidentLight.color * dotNL * RECIPROCAL_PI;
 }
 
 vec3 physicalBased(const in PhysicalMaterial material)

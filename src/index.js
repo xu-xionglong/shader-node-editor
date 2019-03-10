@@ -134,7 +134,7 @@ function init() {
     _control = new OrbitControls(_camera, container);
     _control.enableKeys = false
 
-    let geometry = new THREE.SphereGeometry(5, 64, 64);
+    let geometry = new THREE.SphereGeometry(5, 30, 30);
     _material = new THREE.ShaderMaterial();
     let sphere = new THREE.Mesh(geometry, _material);
     _scene.add(sphere);

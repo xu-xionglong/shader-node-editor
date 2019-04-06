@@ -16,6 +16,7 @@ let _camera;
 let _scene;
 let _renderer;
 let _control;
+let _lightHelpers = [];
 
 
 
@@ -57,8 +58,6 @@ export async function initRete() {
             {name: "Texture", component: new Components.Texture()},
             {name: "NormalMap", component: new Components.NormalMap()},
         ]},
-        {name: "Geometry", component: new Components.Geometry()},
-        {name: "FragColor", component: new Components.FragColor()}
     ];
 
     let registerComponent = (item) => {
@@ -73,6 +72,15 @@ export async function initRete() {
     menuItems.forEach((item) => {
         registerComponent(item);
     });
+    let geometryComponent = new Components.Geometry();
+    let fragColorComponent = new Components.FragColor();
+    editor.register(geometryComponent);
+    engine.register(geometryComponent);
+    editor.register(fragColorComponent);
+    engine.register(fragColorComponent);
+    geometryComponent.createNode().then((node) => editor.addNode(node));
+    fragColorComponent.createNode().then((node) => editor.addNode(node));
+
     let el = document.createElement("div");
     editor.view.container.appendChild(el);
     let menu = ReactDOM.render(<Menu items={menuItems} callback={menuCallback}/>, el);
@@ -140,19 +148,23 @@ function init() {
     _scene.add(sphere);
 
     let lightDirs = [
-        new THREE.Vector3(0, 0, 15),
-        new THREE.Vector3(0, 15, 0)
+        new THREE.Vector3(15, 0, 0),
+        new THREE.Vector3(0, 15, 0),
+        new THREE.Vector3(-15, 0, 0)
     ];
     lightDirs.forEach((dir) => {
         let light = new THREE.DirectionalLight();
         light.position.copy(dir);
         _scene.add(light);
+        let helper = new THREE.DirectionalLightHelper(light, 2.0);
+        _scene.add(helper);
         let control = new THREE.TransformControls(_camera, container);
         control.attach(light);
         _scene.add(control);
         control.addEventListener('dragging-changed', function(event) {
             _control.enabled = !event.value;
         });
+        _lightHelpers.push(helper)
     });
 
 
@@ -161,6 +173,9 @@ function init() {
 
 function update()
 {
+    for(let i = 0; i < _lightHelpers.length; ++ i) {
+        _lightHelpers[i].update();
+    }
     requestAnimationFrame(update);
     _control.update();
     _renderer.render(_scene, _camera);

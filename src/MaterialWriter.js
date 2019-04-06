@@ -15,6 +15,7 @@ export default class MaterialWriter {
 		this.enablePosition = false;
 		this.enableNormalMap = false;
 		this.enableLight = false;
+		this.enableFresnel = false;
 	}
 
 	appendFragmentSourceLine(source) {
@@ -58,6 +59,20 @@ struct DirectionalLight {
 };
 uniform DirectionalLight directionalLights[NUM_DIR_LIGHTS];
 #endif
+
+struct ReflectedLight
+{
+    vec3 directDiffuse;
+    vec3 directSpecular;
+    vec3 indirectDiffuse;
+    vec3 indirectSpecular;
+};
+
+struct IncidentLight
+{
+    vec3 direction;
+    vec3 color;
+};
 `;
 			uniforms = Object.assign(uniforms, THREE.UniformsUtils.clone(THREE.UniformsLib.lights));
 		}
@@ -80,7 +95,17 @@ vec3 perturbNormal2Arb( vec3 eye_pos, vec3 surf_norm, vec3 frag_norm, float norm
 }
 `;
 		}
+		if(this.enableFresnel) {
+			fragmentBuiltinChunk += `
+vec3 F_Schlick(const in vec3 f0, const in float dotLH) {
+    float fresnel = exp2((-5.55473 * dotLH - 6.98316) * dotLH);
+    return (1.0 - f0) * fresnel + f0;
+}
+`
+		}
 		let fragmentShader = [
+			"#define RECIPROCAL_PI 0.31830988618\n",
+			"#define EPSILON 1e-6\n",
 			this.fragmentUniformChunk,
 			varyingChunk,
 			fragmentBuiltinChunk,

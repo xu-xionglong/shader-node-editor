@@ -387,10 +387,110 @@ export class NormalMap extends Rete.Component {
     }    
 };
 
-
-export class PhysicalBased extends Rete.Component {
+export class Cloth extends Rete.Component {
     constructor() {
-        super("PhysicalBased");
+        super("Cloth");
+    }
+
+    builder(node) {
+        node.addInput(new Rete.Input("baseColor", "baseColor", anyTypeSocket));
+        node.addInput(new Rete.Input("roughness", "roughness", anyTypeSocket));
+        node.addInput(new Rete.Input("normal", "normal", anyTypeSocket));
+        node.addOutput(new Rete.Output("color", "color", anyTypeSocket));
+    }
+
+    worker(node, inputs, outputs) {
+        let baseColor = inputs["baseColor"][0];
+        let normal = inputs["normal"][0];
+        let roughness = inputs["roughness"][0];
+        let necessaryInputs = [
+            baseColor,
+            normal,
+            roughness
+        ];
+        for(let i = 0; i < necessaryInputs.length; ++ i) {
+            if(necessaryInputs[i] === undefined) {
+                return;
+            }
+        }
+        let material = this.editor.materialWriter;
+        material.enableLight = true;
+        material.enablePosition = true;
+        material.enableFresnel = true;
+        let functionSource = `
+struct ClothMaterial
+{
+    vec3 baseColor;
+    vec3 normal;
+    float roughness;
+    vec3 sheenColor;
+};
+
+float D_Charlie(float alpha, float dotNH) {
+    float invAlpha  = 1.0 / alpha;
+    float cos2h = dotNH * dotNH;
+    float sin2h = max(1.0 - cos2h, 0.0078125);
+    return (2.0 + invAlpha) * pow(sin2h, invAlpha * 0.5) * (0.5 * RECIPROCAL_PI);
+}
+
+float V_Neubelt(float dotNV, float dotNL) {
+    return min(1.0 / (4.0 * (dotNL + dotNV - dotNL * dotNV)), 65504.0);
+}
+
+void redirectCloth(const in ClothMaterial material, const in IncidentLight incidentLight, inout ReflectedLight reflectedLight)
+{
+    float alpha = material.roughness * material.roughness;
+    vec3 viewDir = normalize(-vViewPosition);
+    vec3 halfDir = normalize(incidentLight.direction + viewDir);
+    vec3 f0 = material.sheenColor;
+    float dotNL = clamp(dot(material.normal, incidentLight.direction), 0.0, 1.0);
+    float dotNV = clamp(dot(material.normal, viewDir), 0.0, 1.0);
+    float dotNH = clamp(dot(material.normal, halfDir), 0.0, 1.0);
+    float dotLH = clamp(dot(incidentLight.direction, halfDir), 0.0, 1.0);
+
+    vec3 F = F_Schlick(f0, dotLH);
+    float G = V_Neubelt(dotNV, dotNL);
+    float D = D_Charlie(alpha, dotNH);
+    reflectedLight.directSpecular += F * (G * D) * incidentLight.color * dotNL;
+
+    reflectedLight.directDiffuse += material.baseColor * incidentLight.color * dotNL;
+}
+
+vec3 cloth(const in ClothMaterial material)
+{
+    IncidentLight incidentLight;
+    ReflectedLight reflectedLight = ReflectedLight(vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0));
+#if (NUM_DIR_LIGHTS > 0)
+    DirectionalLight directionalLight;
+    #pragma unroll_loop
+    for(int i = 0; i < NUM_DIR_LIGHTS; i ++) {
+        directionalLight = directionalLights[i];
+        incidentLight.direction = directionalLight.direction;
+        incidentLight.color = directionalLight.color;
+        redirectCloth(material, incidentLight, reflectedLight);
+    }
+#endif
+    return reflectedLight.directDiffuse + reflectedLight.directSpecular + reflectedLight.indirectDiffuse + reflectedLight.indirectSpecular;
+}
+`
+        let variableName = this.name.toLowerCase() + "_" + node.id;
+        let statement = `ClothMaterial clothMaterial;
+    clothMaterial.baseColor = ${baseColor.variableName};
+    clothMaterial.normal = ${normal.variableName};
+    clothMaterial.roughness = ${roughness.variableName};
+    clothMaterial.sheenColor = sqrt(clothMaterial.baseColor);
+    vec3 ${variableName} = cloth(clothMaterial)`;
+
+        material.appendFragmentSourceLine(statement);
+        material.fragmentFunctionChunk += functionSource;
+        outputs["color"] = {dimension: 3, variableName};
+    }
+};
+
+
+export class Standard extends Rete.Component {
+    constructor() {
+        super("Standard");
     }
 
     builder(node) {
@@ -435,9 +535,16 @@ export class PhysicalBased extends Rete.Component {
         let material = this.editor.materialWriter;
         material.enableLight = true;
         material.enablePosition = true;
+        material.enableFresnel = true;
         let functionSource = `
-#define RECIPROCAL_PI 0.31830988618
-#define EPSILON 1e-6
+struct StandardMaterial
+{
+    vec3 baseColor;
+    float metalness;
+    vec3 normal;
+    float roughness;
+    float reflectance;
+};
 
 float D_GGX(const in float alpha, const in float dotNH) {
     float a2 = alpha * alpha;
@@ -452,35 +559,7 @@ float G_GGX_SmithCorrelated(const in float alpha, const in float dotNL, const in
     return 0.5 / max(gv + gl, EPSILON);
 }
 
-vec3 F_Schlick(const in vec3 f0, const in float dotLH) {
-    float fresnel = exp2((-5.55473 * dotLH - 6.98316) * dotLH);
-    return (1.0 - f0) * fresnel + f0;
-}
-
-struct PhysicalMaterial
-{
-    vec3 baseColor;
-    float metalness;
-    vec3 normal;
-    float roughness;
-    float reflectance;
-};
-
-struct ReflectedLight
-{
-    vec3 directDiffuse;
-    vec3 directSpecular;
-    vec3 indirectDiffuse;
-    vec3 indirectSpecular;
-};
-
-struct IncidentLight
-{
-    vec3 direction;
-    vec3 color;
-};
-
-void redirectPhysicalBased(const in PhysicalMaterial material, const in IncidentLight incidentLight, inout ReflectedLight reflectedLight)
+void redirectStandard(const in StandardMaterial material, const in IncidentLight incidentLight, inout ReflectedLight reflectedLight)
 {
     float alpha = material.roughness * material.roughness;
     vec3 viewDir = normalize(-vViewPosition);
@@ -499,7 +578,7 @@ void redirectPhysicalBased(const in PhysicalMaterial material, const in Incident
     reflectedLight.directDiffuse += diffuseColor * incidentLight.color * dotNL;
 }
 
-vec3 physicalBased(const in PhysicalMaterial material)
+vec3 standard(const in StandardMaterial material)
 {
     IncidentLight incidentLight;
     ReflectedLight reflectedLight = ReflectedLight(vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0));
@@ -510,20 +589,20 @@ vec3 physicalBased(const in PhysicalMaterial material)
         directionalLight = directionalLights[i];
         incidentLight.direction = directionalLight.direction;
         incidentLight.color = directionalLight.color;
-        redirectPhysicalBased(material, incidentLight, reflectedLight);
+        redirectStandard(material, incidentLight, reflectedLight);
     }
 #endif
     return reflectedLight.directDiffuse + reflectedLight.directSpecular + reflectedLight.indirectDiffuse + reflectedLight.indirectSpecular;
 }
 `;
         let variableName = this.name.toLowerCase() + "_" + node.id;
-        let statement = `PhysicalMaterial physicalMaterial;
-    physicalMaterial.baseColor = ${baseColor.variableName};
-    physicalMaterial.metalness = ${metalness.variableName};
-    physicalMaterial.normal = ${normal.variableName};
-    physicalMaterial.roughness = ${roughness.variableName};
-    physicalMaterial.reflectance = ${reflectance.variableName};
-    vec3 ${variableName} = physicalBased(physicalMaterial)`;
+        let statement = `StandardMaterial standardMaterial;
+    standardMaterial.baseColor = ${baseColor.variableName};
+    standardMaterial.metalness = ${metalness.variableName};
+    standardMaterial.normal = ${normal.variableName};
+    standardMaterial.roughness = ${roughness.variableName};
+    standardMaterial.reflectance = ${reflectance.variableName};
+    vec3 ${variableName} = standard(standardMaterial)`;
 
         material.appendFragmentSourceLine(statement);
         material.fragmentFunctionChunk += functionSource;
@@ -556,35 +635,37 @@ export class BlinnPhong extends Rete.Component {
             return;
         }
         let functionSource = `
-void redirectBlinnPhong(vec3 lightDirection, vec3 lightColor,
-                        vec3 normal, vec3 viewDirection,
+void redirectBlinnPhong(vec3 normal, vec3 viewDirection,
                         vec3 baseColor, float shininess,
-                        inout vec3 diffuseColor, inout vec3 specularColor)
+                        const in IncidentLight incidentLight,
+                        inout ReflectedLight reflectedLight)
 {
-    float dotNL = saturate(dot(normal, lightDirection));
-    vec3 halfDirection = normalize(lightDirection + viewDirection);
+    float dotNL = saturate(dot(normal, incidentLight.direction));
+    vec3 halfDirection = normalize(incidentLight.direction + viewDirection);
     float dotNH = saturate(dot(normal, halfDirection));
-    diffuseColor += dotNL * lightColor * baseColor;
-    specularColor += vec3(pow(dotNH, shininess));
+    reflectedLight.directDiffuse += dotNL * incidentLight.color * baseColor;
+    reflectedLight.directSpecular += vec3(pow(dotNH, shininess));
 
 }
 vec3 blinnPhong(vec3 baseColor, float shininess, vec3 normal)
 {
-    vec3 diffuseColor;
-    vec3 specularColor;
+    IncidentLight incidentLight;
+    ReflectedLight reflectedLight = ReflectedLight(vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0));;
     vec3 ambientColor = baseColor * ambientLightColor;
 #if ( NUM_DIR_LIGHTS > 0 )
     DirectionalLight directionalLight;
     #pragma unroll_loop
     for(int i = 0; i < NUM_DIR_LIGHTS; i ++) {
         directionalLight = directionalLights[i];
-        redirectBlinnPhong(directionalLight.direction, directionalLight.color,
-                           normal, normalize(-vViewPosition),
+        incidentLight.direction = directionalLight.direction;
+        incidentLight.color = directionalLight.color;
+        redirectBlinnPhong(normal, normalize(-vViewPosition),
                            baseColor, shininess,
-                           diffuseColor, specularColor);
+                           incidentLight,
+                           reflectedLight);
     }
 #endif
-    return ambientColor + diffuseColor + specularColor;
+    return ambientColor + reflectedLight.directDiffuse + reflectedLight.directSpecular;
 }
 `;
         let variableName = this.name.toLowerCase() + "_" + node.id;

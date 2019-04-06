@@ -52,7 +52,8 @@ export async function initRete() {
         ]},
         {name: "ShadingModel", subItems: [
             {name: "BlinnPhong", component: new Components.BlinnPhong()},
-            {name: "PhysicalBased", component: new Components.PhysicalBased()}
+            {name: "Standard", component: new Components.Standard()},
+            {name: "Cloth", component: new Components.Cloth()}
         ]},
         {name: "Map", subItems: [
             {name: "Texture", component: new Components.Texture()},

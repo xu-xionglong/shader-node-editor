@@ -496,7 +496,7 @@ void redirectPhysicalBased(const in PhysicalMaterial material, const in Incident
     reflectedLight.directSpecular += F * (G * D) * incidentLight.color * dotNL;
 
     vec3 diffuseColor = (1.0 - material.metalness) * material.baseColor;
-    reflectedLight.directDiffuse += diffuseColor * incidentLight.color * dotNL * RECIPROCAL_PI;
+    reflectedLight.directDiffuse += diffuseColor * incidentLight.color * dotNL;
 }
 
 vec3 physicalBased(const in PhysicalMaterial material)

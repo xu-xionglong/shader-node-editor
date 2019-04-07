@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 export default class MaterialWriter {
 	constructor() {
+		this.externalFunctions = new Map();
 		this.resetSource();
 		this.uniforms = {};
 	}
@@ -16,6 +17,8 @@ export default class MaterialWriter {
 		this.enableNormalMap = false;
 		this.enableLight = false;
 		this.enableFresnel = false;
+
+		this.externalFunctions.clear();
 	}
 
 	appendFragmentSourceLine(source) {
@@ -103,6 +106,11 @@ vec3 F_Schlick(const in vec3 f0, const in float dotLH) {
 }
 `
 		}
+
+		for(let value of this.externalFunctions.values()) {
+			this.fragmentFunctionChunk += value + "\n";
+		}
+
 		let fragmentShader = [
 			"#define RECIPROCAL_PI 0.31830988618\n",
 			"#define EPSILON 1e-6\n",

@@ -57,8 +57,15 @@ export async function initRete() {
         ]},
         {name: "Map", subItems: [
             {name: "Texture", component: new Components.Texture()},
-            {name: "NormalMap", component: new Components.NormalMap()},
+            {name: "NormalMap", component: new Components.NormalMap()}
         ]},
+        {name: "ToneMapping", subItems: [
+            {name: "Linear", component: new Components.LinearToneMapping()},
+            {name: "Reinhard", component: new Components.ReinhardToneMapping()},
+            {name: "Uncharted2", component: new Components.Uncharted2ToneMapping()},
+            {name: "Cineon", component: new Components.CineonToneMapping()},
+            {name: "ACESFilmic", component: new Components.ACESFilmicToneMapping()},
+        ]}
     ];
 
     let registerComponent = (item) => {

@@ -289,25 +289,12 @@ export class FragColor extends Rete.Component {
     }
 };
 
-class Script extends Rete.Component {
+class UserScript extends Rete.Component {
     constructor(name) {
-        super("Script");
+        super("UserScript");
     }
 
-    builder(node) {
 
-    }
-
-    worker(node, inputs, outputs) {
-
-    }
-
-    static compile(source) {
-        let functionName;
-        let parameters = [];
-        let returnedDimension;
-        let compiledSource;
-    }
 };
 
 
@@ -676,5 +663,152 @@ vec3 blinnPhong(vec3 baseColor, float shininess, vec3 normal)
         material.appendFragmentSourceLine(statement);
         material.fragmentFunctionChunk += functionSource;
         outputs["color"] = {dimension: 3, variableName};
+    }
+};
+
+class Function extends Rete.Component {
+    constructor(source, returnName) {
+        
+        let sourceCode = source;
+        let inputs = [];
+        let output;
+        let functionName;
+        returnName = returnName === undefined ? "return" : returnName;
+
+        let index = source.indexOf(" ");
+        let returnType = source.substring(0, index);
+        let dimension = typeMap.indexOf(returnType) + 1;
+        if(dimension > 0) {
+            output = {dimension, variableName: returnName};
+        }
+
+        source = source.substring(index + 1);
+        index = source.indexOf("(");
+        functionName = source.substring(0, index).trim();
+
+        source = source.substring(index + 1);
+        index = source.indexOf(")");
+        let parametersStr = source.substring(0, index);
+        let items = parametersStr.split(",");
+        for(let i = 0; i < items.length; ++ i) {
+            let item = items[i].trim();
+            let subItems = item.split(" ");
+            if(subItems.length === 2) {
+                let type = subItems[0];
+                let variableName = subItems[1];
+                dimension = typeMap.indexOf(type) + 1;
+                if(dimension > 0) {
+                    inputs.push({dimension, variableName});
+                }
+            }
+        }
+
+        super(functionName);
+        this.inputs = inputs;
+        this.output = output;
+        this.source = sourceCode;
+    };
+
+    builder(node) {
+        for(let i = 0; i < this.inputs.length; ++ i) {
+            let input = this.inputs[i];
+            node.addInput(new Rete.Input(input.variableName, input.variableName, anyTypeSocket));
+        }
+        if(this.output !== undefined) {
+            node.addOutput(new Rete.Output(this.output.variableName, this.output.variableName, anyTypeSocket));
+        }
+        return node;
+    }
+
+    worker(node, inputs, outputs) {
+        for(let i = 0; i < this.inputs.length; ++ i) {
+            let expectedInput = this.inputs[i];
+            let input = inputs[expectedInput.variableName][0];
+            if(input === undefined || input.dimension !== expectedInput.dimension) {
+                return;
+            }
+        }
+
+        let material = this.editor.materialWriter;
+        if(!material.externalFunctions.has(this.name)) {
+            material.externalFunctions.set(this.name, this.source);
+        }
+        let variableName = this.name.toLowerCase() + "_" + node.id;
+        let statement = `${typeMap[this.output.dimension - 1]} ${variableName} = ${this.name}(`;
+        for(let i = 0; i < this.inputs.length; ++ i) {
+            let expectedInput = this.inputs[i];
+            let input = inputs[expectedInput.variableName][0];
+            statement += input.variableName;
+            if(i !== this.inputs.length - 1) {
+                statement += ",";
+            }
+        }
+        statement += ")";
+        material.appendFragmentSourceLine(statement);
+        if(this.output !== undefined) {
+            outputs[this.output.variableName] = {dimension: this.output.dimension, variableName};
+        }
+    }
+
+};
+
+
+
+export class LinearToneMapping extends Function {
+    constructor() {
+        let source = `vec3 LinearToneMapping(float exposure, vec3 color) {
+    return exposure * color;
+}
+`;
+        super(source, "color");
+    }
+
+};
+
+export class ReinhardToneMapping extends Function {
+    constructor() {
+        let source = `vec3 ReinhardToneMapping(float exposure, vec3 color) {
+    color *= exposure;
+    return clamp(color / (vec3(1.0) + color), 0.0, 1.0);
+}
+`;
+        super(source, "color");
+    }
+
+
+};
+
+export class Uncharted2ToneMapping extends Function {
+    constructor() {
+        let source = `vec3 Uncharted2ToneMapping(float exposure, float whitePoint, vec3 color) {
+    color *= exposure;
+}
+`;
+        super(source, "color");
+    }
+
+};
+
+export class CineonToneMapping extends Function {
+    constructor() {
+        let source = `vec3 CineonToneMapping(float exposure, vec3 color) {
+    color *= exposure;
+    color = max(vec3(0.0), color - 0.004);
+    return pow((color * (6.2 * color + 0.5)) / (color * (6.2 * color + 1.7) + 0.06 ), vec3(2.2));
+}
+`;
+        super(source, "color");
+    }
+
+};
+
+export class ACESFilmicToneMapping extends Function {
+    constructor() {
+        let source = `vec3 ACESFilmicToneMapping(float exposure, vec3 color) {
+    color *= exposure;
+    return clamp((color * (2.51 * color + 0.03)) / (color * ( 2.43 * color + 0.59) + 0.14), 0.0, 1.0);
+}
+`;
+        super(source, "color");
     }
 };
